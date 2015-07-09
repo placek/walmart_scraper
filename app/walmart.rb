@@ -55,6 +55,7 @@ module Walmart
       end
 
       def fetch_data(from_page = 1)
+        @data = []
         current_page = from_page
         until((data = fetch_page_data(current_page)).count.zero?) do
           @data << data
@@ -64,11 +65,7 @@ module Walmart
       end
 
       def data
-        @data.flatten
-      end
-
-      def last_page
-        @data.count
+        @data.flatten(1)
       end
 
       private
@@ -127,8 +124,14 @@ if __FILE__ == $0
     def test_fetching_data
       VCR.use_cassette("synopsis") do
         assert_equal 4, @scraper.fetch_data.count
-        assert_equal 4, @scraper.last_page
-        assert_equal 198, @scraper.data.count
+        assert_equal 66, @scraper.data.count
+      end
+    end
+
+    def test_fetching_data_from_specified_page
+      VCR.use_cassette("synopsis") do
+        assert_equal 3, @scraper.fetch_data(2).count
+        assert_equal 46, @scraper.data.count
       end
     end
   end
