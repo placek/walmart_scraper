@@ -1,5 +1,7 @@
 class Product
-  attr_reader :id, :data
+  attr_reader :id
+  attr_accessor :data
+
   def initialize(attrs)
     @id, @data = attrs.values_at(:id, :data)
   end
@@ -23,6 +25,12 @@ end
 
 class CreateProduct < ROM::Commands::Create[:memory]
   register_as :create
+  relation :products
+  result :one
+end
+
+class UpdateProduct < ROM::Commands::Update[:memory]
+  register_as :update
   relation :products
   result :one
 end

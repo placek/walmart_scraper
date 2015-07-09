@@ -1,10 +1,11 @@
-require "sinatra"
 require "rom"
+ROM.setup(:memory)
+
+require "sinatra"
 require "haml"
 require "./product"
 require "./walmart"
 
-ROM.setup(:memory)
 rom = ROM.finalize.env
 
 get '/' do
@@ -14,12 +15,12 @@ end
 
 post '/' do
   product_id = Walmart::IDExtractor.new(params[:url]).extract
-  begin
-    rom.relation(:products).by_id(product_id.to_i).as(:entity).one!
-  rescue
-    scraper = Walmart::Scraper::Product.new(product_id)
-    scraper.fetch_data
-    rom.command(:products).create.call(id: product_id, data: scraper.data)
+  scraper = Walmart::Scraper::Product.new(product_id)
+  product = rom.relation(:products).by_id(product_id).as(:entity).one! rescue nil
+  if product
+    rom.commands.products.update.by_id(product.id).call(data: scraper.append(product.data))
+  else
+    rom.command(:products).create.call(id: product_id, data: scraper.fetch)
   end
   redirect "/#{product_id}"
 end
@@ -42,7 +43,8 @@ __END__
     = yield
 
 @@ index
-%h3 Products
+%strong
+  Products
 
 %form{ action: "/", method: "post" }
   %input{ type: "text", name: "url" }
@@ -54,9 +56,12 @@ __END__
       %a{ href: "/#{product.id}" }= "Product ##{product.id}"
 
 @@product
-%h3= "Product ##{@product.id}"
+%strong
+  %a{ href: "/" } Products
+  >
+  = "Product ##{@product.id}"
 
 %dl
-  - @product.data.each do |rating|
-    %dt= "Rated: #{rating[1]} at #{rating[0]}"
-    %dd= rating[2]
+  - @product.data[:reviews].each do |review|
+    %dt= "Rated: #{review[:rating]} at #{review[:date]}"
+    %dd= review[:comment]

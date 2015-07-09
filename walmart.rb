@@ -1,5 +1,4 @@
 require "mechanize"
-require "sidekiq"
 
 module Walmart
 
@@ -16,6 +15,7 @@ module Walmart
   module Scraper
 
     class Page
+
       PAGE_LIMIT = 20
 
       def initialize(id, page_number)
@@ -37,43 +37,68 @@ module Walmart
       end
 
       def fetch_all
-        fetch_dates.zip(fetch_ratings).zip(fetch_comments).map(&:flatten)
+        feched_reviews.map do |review|
+          {
+            date: review[0],
+            rating: review[1],
+            comment: review[2]
+          }
+        end
       end
 
       private
+
+      def feched_reviews
+        fetch_dates.zip(fetch_ratings).zip(fetch_comments).map(&:flatten)
+      end
 
       def fetch_page
         @page ||= @mechanize.get(reviews_url)
       end
 
-      def reviews_url(limit = PAGE_LIMIT)
-        "https://www.walmart.com/reviews/product/%d?limit=%d&page=%d&sort=submission-asc" % [@id, limit, @page_number]
+      def reviews_url
+        "https://www.walmart.com/reviews/product/%d?limit=%d&page=%d&sort=submission-asc" % [@id, PAGE_LIMIT, @page_number]
       end
     end
 
     class Product
+
       def initialize(id)
         @id = id
-        @data = []
+        @last_page = 1
       end
 
-      def fetch_data(from_page = 1)
-        @data = []
-        current_page = from_page
-        until((data = fetch_page_data(current_page)).count.zero?) do
-          @data << data
-          current_page +=1
-        end
-        @data
+      def fetch
+        @reviews = []
+        fetch_all_pages
+        {
+          last_page: @last_page,
+          reviews: @reviews
+        }
       end
 
-      def data
-        @data.flatten(1)
+      def append(data)
+        @reviews = data[:reviews][0..(data[:last_page] * Walmart::Scraper::Page::PAGE_LIMIT) + 1]
+        fetch_all_pages(data[:last_page])
+        {
+          last_page: @last_page,
+          reviews: @reviews
+        }
       end
 
       private
 
-      def fetch_page_data(current_page)
+      def fetch_all_pages(from_page = 1)
+        current_page = from_page
+        until((packet = fetch_page(current_page)).empty?) do
+          @reviews << packet
+          current_page +=1
+        end
+        @last_page = current_page - 1
+        @reviews.flatten!
+      end
+
+      def fetch_page(current_page)
         Walmart::Scraper::Page.new(@id, current_page).fetch_all
       end
     end
@@ -117,6 +142,12 @@ if __FILE__ == $0
         assert_equal false, @scraper.fetch_ratings.any?(&:nil?)
       end
     end
+
+    def test_fetching_all_reviews
+      VCR.use_cassette("synopsis") do
+        assert_equal 20, @scraper.fetch_all.count
+      end
+    end
   end
 
   class TestWalmartScraperProduct < Minitest::Test
@@ -124,17 +155,17 @@ if __FILE__ == $0
       @scraper = Walmart::Scraper::Product.new 20925212
     end
 
-    def test_fetching_data
+    def test_fetching_reviews
       VCR.use_cassette("synopsis") do
-        assert_equal 4, @scraper.fetch_data.count
-        assert_equal 66, @scraper.data.count
+        assert_equal 66, @scraper.fetch[:reviews].count
+        assert_equal 4, @scraper.fetch[:last_page]
       end
     end
 
-    def test_fetching_data_from_specified_page
+    def test_fetching_reviews_from_specified_page
       VCR.use_cassette("synopsis") do
-        assert_equal 3, @scraper.fetch_data(2).count
-        assert_equal 46, @scraper.data.count
+        assert_equal 46, @scraper.fetch(2)[:reviews].count
+        assert_equal 4, @scraper.fetch(2)[:last_page]
       end
     end
   end
