@@ -8,13 +8,7 @@ require './walmart'
 
 rom = ROM.finalize.env
 
-get '/' do
-  @products = rom.relation(:products).as(:entity).to_a
-  haml :index
-end
-
-post '/' do
-  product_id = Walmart::IDExtractor.new(params[:url]).extract
+def create_or_update_product(product_id)
   scraper = Walmart::Scraper::Product.new(product_id)
   product = rom.relation(:products).by_id(product_id).as(:entity).one! rescue nil
   if product
@@ -22,7 +16,17 @@ post '/' do
   else
     rom.command(:products).create.call(id: product_id, data: scraper.fetch)
   end
-  redirect "/#{product_id}"
+end
+
+get '/' do
+  @products = rom.relation(:products).as(:entity).to_a
+  haml :index
+end
+
+post '/' do
+  product_id = Walmart::IDExtractor.new(params[:url]).extract
+  create_or_update_product(product_id)
+  redirect "/%d" % product_id
 end
 
 get '/:id' do |product_id|
