@@ -2,8 +2,8 @@ require "sinatra"
 require "rom"
 require "haml"
 ROM.setup(:memory)
-require './app/product'
-require './app/walmart'
+require './product'
+require './walmart'
 
 rom = ROM.finalize.env
 
@@ -17,9 +17,10 @@ post '/' do
   product_id = Walmart::IDExtractor.new(params[:url]).extract
   begin
     rom.relation(:products).by_id(product_id.to_i).as(:entity).one!
-
   rescue
-    rom.command(:products).create.call(id: product_id, data: [])
+    scraper = Walmart::Scraper::Product.new(product_id)
+    scraper.fetch_data
+    rom.command(:products).create.call(id: product_id, data: scraper.data)
   end
   redirect "/#{product_id}"
 end
