@@ -1,4 +1,5 @@
 require "mechanize"
+require "sidekiq"
 
 module Walmart
 
@@ -15,6 +16,8 @@ module Walmart
   module Scraper
 
     class Page
+      PAGE_LIMIT = 20
+
       def initialize(id, page_number)
         @id = id
         @page_number = page_number
@@ -43,7 +46,7 @@ module Walmart
         @page ||= @mechanize.get(reviews_url)
       end
 
-      def reviews_url(limit = 20)
+      def reviews_url(limit = PAGE_LIMIT)
         "https://www.walmart.com/reviews/product/%d?limit=%d&page=%d&sort=submission-asc" % [@id, limit, @page_number]
       end
     end
