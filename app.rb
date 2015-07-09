@@ -1,10 +1,10 @@
-require "rom"
+require 'rom'
 ROM.setup(:memory)
 
-require "sinatra"
-require "haml"
-require "./product"
-require "./walmart"
+require 'sinatra'
+require 'haml'
+require './product'
+require './walmart'
 
 rom = ROM.finalize.env
 
@@ -29,7 +29,7 @@ get '/:id' do |product_id|
   begin
     @product = rom.relation(:products).by_id(product_id.to_i).as(:entity).one!
   rescue
-    return "404"
+    halt 404
   end
   haml :product
 end
