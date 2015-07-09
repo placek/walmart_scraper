@@ -1,15 +1,14 @@
 require "sinatra"
 require "rom"
 require "haml"
-ROM.setup(:memory)
-require './product'
-require './walmart'
+require "./product"
+require "./walmart"
 
+ROM.setup(:memory)
 rom = ROM.finalize.env
 
 get '/' do
   @products = rom.relation(:products).as(:entity).to_a
-  puts @products
   haml :index
 end
 
@@ -55,7 +54,7 @@ __END__
       %a{ href: "/#{product.id}" }= "Product ##{product.id}"
 
 @@product
-%h3= "Product#{@product.id}"
+%h3= "Product ##{@product.id}"
 
 %dl
   - @product.data.each do |rating|
